@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ape_secrets
+      POSTGRES_USER: ape_user
+      POSTGRES_PASSWORD: ape_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ape_user -d ape_secrets"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ape:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ./config.yaml:/root/config.yaml
+      - ./logs:/root/logs
+
+volumes:
+  postgres_data:

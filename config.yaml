@@ -1,0 +1,30 @@
+server:
+  host: "localhost"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "ape_secrets"
+  user: "ape_user"
+  password: "ape_password"
+  sslmode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 25
+
+security:
+  jwt_secret: "your-super-secret-jwt-key-change-this-in-production"
+  encryption_key: "32-byte-encryption-key-change-me!!"
+  token_ttl: "1h"
+  secret_ttl: "24h"
+
+logging:
+  level: "info"
+  format: "json"
+  file: "logs/ape.log"
+
+audit:
+  enabled: true
+  file: "logs/audit.log"
