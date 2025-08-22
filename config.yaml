@@ -7,7 +7,7 @@ server:
 database:
   host: "localhost"
   port: 5432
-  name: "ape_secrets"
+  name: "ape_db"
   user: "ape_user"
   password: "ape_password"
   sslmode: "disable"

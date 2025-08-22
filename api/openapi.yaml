@@ -1,0 +1,597 @@
+openapi: 3.0.3
+info:
+  title: A.P.E. (Authorized Primate Encryption) API
+  description: |
+    Enterprise-grade secrets management service for secure storage and retrieval of sensitive data.
+    
+    ## Authentication
+    This API uses JWT tokens for authentication. Most endpoints require a valid JWT token in the Authorization header.
+    
+    ## AppRole Authentication
+    The service supports AppRole authentication for machine-to-machine communication.
+    
+    ## Features
+    - Secure secret storage with AES-GCM encryption
+    - Role-based access control
+    - Audit logging
+    - Token management with configurable TTL
+    - Policy-based access control
+  version: 1.0.0
+  contact:
+    name: The Monkeys Development Team
+    email: dev@themonkeys.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.ape.themonkeys.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    AppRole:
+      type: object
+      properties:
+        role_id:
+          type: string
+          format: uuid
+          description: Unique identifier for the AppRole
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        role_name:
+          type: string
+          description: Human-readable name for the role
+          example: "api-service"
+        secret_id:
+          type: string
+          format: uuid
+          description: Secret identifier for authentication
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        policies:
+          type: array
+          items:
+            type: string
+          description: List of policies assigned to this role
+          example: ["read-secrets", "write-logs"]
+        token_ttl:
+          type: integer
+          description: Token time-to-live in seconds
+          example: 3600
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    AppRoleRequest:
+      type: object
+      required:
+        - role_name
+        - policies
+      properties:
+        role_name:
+          type: string
+          description: Human-readable name for the role
+          example: "api-service"
+        policies:
+          type: array
+          items:
+            type: string
+          description: List of policies to assign to this role
+          example: ["read-secrets", "write-logs"]
+        token_ttl:
+          type: integer
+          description: "Token time-to-live in seconds (default: 3600)"
+          example: 7200
+
+    LoginRequest:
+      type: object
+      required:
+        - role_id
+        - secret_id
+      properties:
+        role_id:
+          type: string
+          format: uuid
+          description: AppRole identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        secret_id:
+          type: string
+          format: uuid
+          description: Secret identifier for the AppRole
+          example: "550e8400-e29b-41d4-a716-446655440001"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration time
+        token_type:
+          type: string
+          description: Type of token
+          example: "Bearer"
+
+    Secret:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the secret
+          example: "550e8400-e29b-41d4-a716-446655440002"
+        path:
+          type: string
+          description: Secret path/key
+          example: "database/postgres/password"
+        data:
+          type: object
+          additionalProperties: true
+          description: Secret data (encrypted at rest)
+          example:
+            username: "dbuser"
+            password: "securepassword123"
+            host: "localhost"
+            port: 5432
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata
+          example:
+            environment: "production"
+            team: "backend"
+        version:
+          type: integer
+          description: Secret version number
+          example: 1
+        created_by:
+          type: string
+          description: Creator identifier
+          example: "api-service"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    SecretRequest:
+      type: object
+      required:
+        - path
+        - data
+      properties:
+        path:
+          type: string
+          description: Secret path/key
+          example: "database/postgres/password"
+        data:
+          type: object
+          additionalProperties: true
+          description: Secret data to store
+          example:
+            username: "dbuser"
+            password: "securepassword123"
+            host: "localhost"
+            port: 5432
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata
+          example:
+            environment: "production"
+            team: "backend"
+
+    Policy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the policy
+        name:
+          type: string
+          description: Policy name
+          example: "read-secrets"
+        rules:
+          type: object
+          description: Policy rules in JSON format
+          example:
+            path:
+              "secret/*":
+                capabilities: ["read"]
+              "secret/database/*":
+                capabilities: ["read", "write"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Service health status
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Health check timestamp
+        version:
+          type: string
+          description: Service version
+          example: "1.0.0"
+        uptime:
+          type: string
+          description: Service uptime
+          example: "24h30m15s"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid credentials"
+        code:
+          type: string
+          description: Error code
+          example: "INVALID_CREDENTIALS"
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check the health status of the A.P.E. service
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /auth/login:
+    post:
+      summary: AppRole Login
+      description: Authenticate using AppRole credentials and receive a JWT token
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/approle:
+    post:
+      summary: Create AppRole
+      description: Create a new AppRole for authentication
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppRoleRequest'
+      responses:
+        '201':
+          description: AppRole created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppRole'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/approle/{roleId}:
+    get:
+      summary: Get AppRole
+      description: Retrieve an AppRole by its ID
+      tags:
+        - Authentication
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: AppRole ID
+      responses:
+        '200':
+          description: AppRole retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppRole'
+        '404':
+          description: AppRole not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /secret:
+    post:
+      summary: Create Secret
+      description: Store a new secret in the A.P.E. service
+      tags:
+        - Secrets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretRequest'
+      responses:
+        '201':
+          description: Secret created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /secret/{path}:
+    get:
+      summary: Get Secret
+      description: Retrieve a secret by its path
+      tags:
+        - Secrets
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Secret path
+          example: "database/postgres/password"
+      responses:
+        '200':
+          description: Secret retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '404':
+          description: Secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update Secret
+      description: Update an existing secret
+      tags:
+        - Secrets
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Secret path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretRequest'
+      responses:
+        '200':
+          description: Secret updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete Secret
+      description: Delete a secret by its path
+      tags:
+        - Secrets
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Secret path
+      responses:
+        '204':
+          description: Secret deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /secret/{path}/versions:
+    get:
+      summary: List Secret Versions
+      description: List all versions of a secret
+      tags:
+        - Secrets
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Secret path
+      responses:
+        '200':
+          description: Secret versions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Secret'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: Authentication and authorization endpoints
+  - name: Secrets
+    description: Secret management endpoints

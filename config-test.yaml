@@ -1,0 +1,25 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "debug"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "ape_user"
+  password: "ape_password"
+  dbname: "ape_db"
+  sslmode: "disable"
+
+security:
+  jwt_secret: "test-jwt-secret-key-for-development-only"
+  encryption_key: "test-encryption-key-32-chars-long"
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+audit:
+  enabled: true
+  retention_days: 90

@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -69,7 +71,12 @@ func (s *Server) setupRoutes() *gin.Engine {
 	r.Use(gin.Recovery())
 
 	// Health check (no auth required)
+	r.GET("/health", s.handler.Health)
 	r.GET("/v1/health", s.handler.Health)
+
+	// Documentation endpoints (no auth required)
+	r.GET("/docs/swagger", s.handler.ServeSwaggerUI)
+	r.GET("/docs/openapi.json", s.handler.ServeOpenAPISpec)
 
 	// Auth routes (no auth required)
 	auth := r.Group("/v1/auth")
@@ -105,6 +112,28 @@ func (s *Server) setupRoutes() *gin.Engine {
 	return r
 }
 
+// openBrowser opens the URL in the default browser
+func openBrowser(url string) {
+	var err error
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		log.Printf("📖 API Documentation available at: %s", url)
+		return
+	}
+	if err != nil {
+		log.Printf("❌ Failed to open browser automatically: %v", err)
+		log.Printf("📖 Please manually open: %s", url)
+	} else {
+		log.Printf("🌐 Opened API documentation in browser: %s", url)
+	}
+}
+
 func (s *Server) Start() error {
 	router := s.setupRoutes()
 
@@ -127,6 +156,13 @@ func (s *Server) Start() error {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
+	}()
+
+	// Give the server a moment to start, then open browser
+	go func() {
+		time.Sleep(1 * time.Second)
+		docsURL := fmt.Sprintf("http://%s:%d/docs/swagger", s.config.Server.Host, s.config.Server.Port)
+		openBrowser(docsURL)
 	}()
 
 	// Wait for interrupt signal to gracefully shutdown the server
@@ -168,14 +204,11 @@ func (s *Server) cleanupRoutine() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			if err := s.store.CleanupExpiredTokens(ctx); err != nil {
-				log.Printf("Failed to cleanup expired tokens: %v", err)
-			}
-			cancel()
+	for range ticker.C {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := s.store.CleanupExpiredTokens(ctx); err != nil {
+			log.Printf("Failed to cleanup expired tokens: %v", err)
 		}
+		cancel()
 	}
 }
